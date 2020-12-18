@@ -490,20 +490,25 @@ func expandAppServiceEnvironmentClusterSettings(input interface{}) *[]web.NameVa
 }
 
 func flattenClusterSettings(input *[]web.NameValuePair) interface{} {
-	if input == nil {
+	if len(*input) == 0 {
 		return []map[string]interface{}{}
 	}
 
-	settings := make([]map[string]interface{}, len(*input))
+	settings := make([]map[string]interface{}, 0)
 	for _, v := range *input {
 		name := ""
 		if v.Name != nil {
 			name = *v.Name
 		}
+		if name == "" {
+			continue
+		}
+
 		value := ""
 		if v.Value != nil {
 			value = *v.Value
 		}
+
 		settings = append(settings, map[string]interface{}{
 			"name":  name,
 			"value": value,
