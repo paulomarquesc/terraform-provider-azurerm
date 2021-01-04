@@ -497,11 +497,10 @@ func flattenClusterSettings(input *[]web.NameValuePair) interface{} {
 	settings := make([]map[string]interface{}, 0)
 	for _, v := range *input {
 		name := ""
-		if v.Name != nil {
-			name = *v.Name
-		}
-		if name == "" {
+		if v.Name == nil {
 			continue
+		} else {
+			name = *v.Name
 		}
 
 		value := ""
