@@ -159,7 +159,7 @@ func TestAccAppServiceEnvironment_internalLoadBalancer(t *testing.T) {
 	})
 }
 
-func TestAccAzureRMAppServiceEnvironment_clusterSettings(t *testing.T) {
+func TestAccAppServiceEnvironment_clusterSettings(t *testing.T) {
 	data := acceptance.BuildTestData(t, "azurerm_app_service_environment", "test")
 	r := AppServiceEnvironmentResource{}
 
