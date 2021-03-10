@@ -1,6 +1,7 @@
 package netapp
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log"
 	"regexp"
@@ -96,6 +97,11 @@ func resourceNetAppAccount() *schema.Resource {
 						"organizational_unit": {
 							Type:     schema.TypeString,
 							Optional: true,
+						},
+						"root_ca_certificate": {
+							Type:         schema.TypeString,
+							Optional:     true,
+							ValidateFunc: validation.StringIsBase64,
 						},
 					},
 				},
@@ -216,13 +222,17 @@ func expandNetAppActiveDirectories(input []interface{}) *[]netapp.ActiveDirector
 		v := item.(map[string]interface{})
 		dns := strings.Join(*utils.ExpandStringSlice(v["dns_servers"].([]interface{})), ",")
 
+		
+		certBase64Content := base64.StdEncoding.
+
 		result := netapp.ActiveDirectory{
-			DNS:                utils.String(dns),
-			Domain:             utils.String(v["domain"].(string)),
-			OrganizationalUnit: utils.String(v["organizational_unit"].(string)),
-			Password:           utils.String(v["password"].(string)),
-			SmbServerName:      utils.String(v["smb_server_name"].(string)),
-			Username:           utils.String(v["username"].(string)),
+			DNS:                     utils.String(dns),
+			Domain:                  utils.String(v["domain"].(string)),
+			OrganizationalUnit:      utils.String(v["organizational_unit"].(string)),
+			Password:                utils.String(v["password"].(string)),
+			SmbServerName:           utils.String(v["smb_server_name"].(string)),
+			Username:                utils.String(v["username"].(string)),
+			ServerRootCACertificate: utils.String(certBase64Content),
 		}
 
 		results = append(results, result)
