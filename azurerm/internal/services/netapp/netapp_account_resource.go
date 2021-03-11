@@ -1,7 +1,6 @@
 package netapp
 
 import (
-	"encoding/base64"
 	"fmt"
 	"log"
 	"regexp"
@@ -222,9 +221,6 @@ func expandNetAppActiveDirectories(input []interface{}) *[]netapp.ActiveDirector
 		v := item.(map[string]interface{})
 		dns := strings.Join(*utils.ExpandStringSlice(v["dns_servers"].([]interface{})), ",")
 
-		
-		certBase64Content := base64.StdEncoding.
-
 		result := netapp.ActiveDirectory{
 			DNS:                     utils.String(dns),
 			Domain:                  utils.String(v["domain"].(string)),
@@ -232,7 +228,7 @@ func expandNetAppActiveDirectories(input []interface{}) *[]netapp.ActiveDirector
 			Password:                utils.String(v["password"].(string)),
 			SmbServerName:           utils.String(v["smb_server_name"].(string)),
 			Username:                utils.String(v["username"].(string)),
-			ServerRootCACertificate: utils.String(certBase64Content),
+			ServerRootCACertificate: utils.String(v["root_ca_certificate"].(string)),
 		}
 
 		results = append(results, result)
