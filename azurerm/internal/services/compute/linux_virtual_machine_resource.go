@@ -53,7 +53,7 @@ func resourceLinuxVirtualMachine() *schema.Resource {
 				Type:         schema.TypeString,
 				Required:     true,
 				ForceNew:     true,
-				ValidateFunc: ValidateVmName,
+				ValidateFunc: computeValidate.VirtualMachineName,
 			},
 
 			"resource_group_name": azure.SchemaResourceGroupName(),
@@ -130,7 +130,7 @@ func resourceLinuxVirtualMachine() *schema.Resource {
 				Computed: true,
 				ForceNew: true,
 
-				ValidateFunc: ValidateLinuxComputerNameFull,
+				ValidateFunc: computeValidate.LinuxComputerNameFull,
 			},
 
 			"custom_data": base64.OptionalSchema(true),
@@ -247,6 +247,15 @@ func resourceLinuxVirtualMachine() *schema.Resource {
 				ValidateFunc: computeValidate.VirtualMachineScaleSetID,
 			},
 
+			"platform_fault_domain": {
+				Type:         schema.TypeInt,
+				Optional:     true,
+				Default:      -1,
+				ForceNew:     true,
+				RequiredWith: []string{"virtual_machine_scale_set_id"},
+				ValidateFunc: validation.IntAtLeast(-1),
+			},
+
 			"tags": tags.Schema(),
 
 			"zone": {
@@ -328,7 +337,7 @@ func resourceLinuxVirtualMachineCreate(d *schema.ResourceData, meta interface{})
 	if v, ok := d.GetOk("computer_name"); ok && len(v.(string)) > 0 {
 		computerName = v.(string)
 	} else {
-		_, errs := ValidateLinuxComputerNameFull(d.Get("name"), "computer_name")
+		_, errs := computeValidate.LinuxComputerNameFull(d.Get("name"), "computer_name")
 		if len(errs) > 0 {
 			return fmt.Errorf("unable to assume default computer name %s Please adjust the %q, or specify an explicit %q", errs[0], "name", "computer_name")
 		}
@@ -470,6 +479,11 @@ func resourceLinuxVirtualMachineCreate(d *schema.ResourceData, meta interface{})
 		params.VirtualMachineScaleSet = &compute.SubResource{
 			ID: utils.String(v.(string)),
 		}
+	}
+
+	platformFaultDomain := d.Get("platform_fault_domain").(int)
+	if platformFaultDomain != -1 {
+		params.PlatformFaultDomain = utils.Int32(int32(platformFaultDomain))
 	}
 
 	if v, ok := d.GetOk("zone"); ok {
@@ -614,6 +628,11 @@ func resourceLinuxVirtualMachineRead(d *schema.ResourceData, meta interface{}) e
 		virtualMachineScaleSetId = *props.VirtualMachineScaleSet.ID
 	}
 	d.Set("virtual_machine_scale_set_id", virtualMachineScaleSetId)
+	platformFaultDomain := -1
+	if props.PlatformFaultDomain != nil {
+		platformFaultDomain = int(*props.PlatformFaultDomain)
+	}
+	d.Set("platform_fault_domain", platformFaultDomain)
 
 	if profile := props.OsProfile; profile != nil {
 		d.Set("admin_username", profile.AdminUsername)

@@ -68,11 +68,7 @@ func resourceFrontDoorCustomHttpsConfiguration() *schema.Resource {
 
 		SchemaVersion: 1,
 		StateUpgraders: []schema.StateUpgrader{
-			{
-				Type:    migration.CustomHttpsConfigurationV0Schema().CoreConfigSchema().ImpliedType(),
-				Upgrade: migration.CustomHttpsConfigurationV0ToV1,
-				Version: 0,
-			},
+			migration.CustomHttpsConfigurationV0ToV1(),
 		},
 	}
 }
@@ -216,18 +212,18 @@ func updateCustomHttpsConfiguration(ctx context.Context, client *frontdoor.Front
 	}
 
 	if input.customHttpsProvisioningEnabled {
-		// Build a custom Https configuration based off the config file to send to the enable call
-		// NOTE: I do not need to check to see if this exists since I already do that in the validation code
-		customHTTPSConfiguration := input.customHttpsConfigurationNew[0].(map[string]interface{})
-		minTLSVersion := frontdoor.OneFullStopTwo // Default to TLS 1.2
-		if httpsConfig := input.customHttpsConfigurationCurrent; httpsConfig != nil {
-			minTLSVersion = httpsConfig.MinimumTLSVersion
-		}
-		customHTTPSConfigurationUpdate := makeCustomHttpsConfiguration(customHTTPSConfiguration, minTLSVersion)
-		if input.provisioningState == frontdoor.CustomHTTPSProvisioningStateDisabled || customHTTPSConfigurationUpdate != *input.customHttpsConfigurationCurrent {
-			// Enable Custom Domain HTTPS for the Frontend Endpoint
-			if err := resourceFrontDoorFrontendEndpointEnableHttpsProvisioning(ctx, client, input.frontendEndpointId, true, customHTTPSConfigurationUpdate); err != nil {
-				return fmt.Errorf("unable to enable/update Custom Domain HTTPS for Frontend Endpoint %q (Resource Group %q): %+v", input.frontendEndpointId.Name, input.frontendEndpointId.ResourceGroup, err)
+		if len(input.customHttpsConfigurationNew) > 0 && input.customHttpsConfigurationNew[0] != nil {
+			customHTTPSConfiguration := input.customHttpsConfigurationNew[0].(map[string]interface{})
+			minTLSVersion := frontdoor.OneFullStopTwo // Default to TLS 1.2
+			if httpsConfig := input.customHttpsConfigurationCurrent; httpsConfig != nil {
+				minTLSVersion = httpsConfig.MinimumTLSVersion
+			}
+			customHTTPSConfigurationUpdate := makeCustomHttpsConfiguration(customHTTPSConfiguration, minTLSVersion)
+			if input.provisioningState == frontdoor.CustomHTTPSProvisioningStateDisabled || customHTTPSConfigurationUpdate != *input.customHttpsConfigurationCurrent {
+				// Enable Custom Domain HTTPS for the Frontend Endpoint
+				if err := resourceFrontDoorFrontendEndpointEnableHttpsProvisioning(ctx, client, input.frontendEndpointId, true, customHTTPSConfigurationUpdate); err != nil {
+					return fmt.Errorf("unable to enable/update Custom Domain HTTPS for Frontend Endpoint %q (Resource Group %q): %+v", input.frontendEndpointId.Name, input.frontendEndpointId.ResourceGroup, err)
+				}
 			}
 		}
 	} else if !input.customHttpsProvisioningEnabled && input.provisioningState == frontdoor.CustomHTTPSProvisioningStateEnabled {

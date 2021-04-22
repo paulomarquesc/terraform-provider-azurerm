@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/services/compute/validate"
+
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2020-12-01/compute"
 	"github.com/hashicorp/go-azure-helpers/response"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
@@ -49,8 +51,10 @@ func resourceSshPublicKey() *schema.Resource {
 					"Public SSH Key name must be 1 - 128 characters long, can contain letters, numbers, underscores, and hyphens (but the first and last character must be a letter or number).",
 				),
 			},
-
-			"resource_group_name": azure.SchemaResourceGroupName(),
+			// We have to ignore case due to incorrect capitalisation of resource group name in
+			// ID in the response we get from the API request.
+			// Related issue: https://github.com/Azure/azure-rest-api-specs/issues/13491
+			"resource_group_name": azure.SchemaResourceGroupNameDiffSuppress(),
 
 			"location": azure.SchemaLocation(),
 
@@ -58,7 +62,7 @@ func resourceSshPublicKey() *schema.Resource {
 				Type:         schema.TypeString,
 				Required:     true,
 				ForceNew:     false,
-				ValidateFunc: ValidateSSHKey,
+				ValidateFunc: validate.SSHKey,
 			},
 
 			"tags": tags.Schema(),

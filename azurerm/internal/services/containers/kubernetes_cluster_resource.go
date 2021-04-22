@@ -9,7 +9,7 @@ import (
 
 	privateDnsValidate "github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/services/privatedns/validate"
 
-	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2020-12-01/containerservice"
+	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2021-02-01/containerservice"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/customdiff"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/validation"
@@ -108,6 +108,17 @@ func resourceKubernetesCluster() *schema.Resource {
 							Optional: true,
 							Default:  false,
 						},
+						"expander": {
+							Type:     schema.TypeString,
+							Optional: true,
+							Computed: true,
+							ValidateFunc: validation.StringInSlice([]string{
+								string(containerservice.LeastWaste),
+								string(containerservice.MostPods),
+								string(containerservice.Priority),
+								string(containerservice.Random),
+							}, false),
+						},
 						"max_graceful_termination_sec": {
 							Type:     schema.TypeString,
 							Optional: true,
@@ -156,6 +167,11 @@ func resourceKubernetesCluster() *schema.Resource {
 							ValidateFunc: containerValidate.Duration,
 						},
 						"scale_down_utilization_threshold": {
+							Type:     schema.TypeString,
+							Optional: true,
+							Computed: true,
+						},
+						"empty_bulk_delete_max": {
 							Type:     schema.TypeString,
 							Optional: true,
 							Computed: true,
@@ -855,7 +871,7 @@ func resourceKubernetesClusterCreate(d *schema.ResourceData, meta interface{}) e
 	}
 
 	if v, ok := d.GetOk("private_dns_zone_id"); ok {
-		if (parameters.Identity == nil && !servicePrincipalSet) || (v.(string) != "System" && (!servicePrincipalSet && parameters.Identity.Type != containerservice.ResourceIdentityTypeUserAssigned)) {
+		if (parameters.Identity == nil && !servicePrincipalSet) || (v.(string) != "System" && v.(string) != "None" && (!servicePrincipalSet && parameters.Identity.Type != containerservice.ResourceIdentityTypeUserAssigned)) {
 			return fmt.Errorf("a user assigned identity or a service principal must be used when using a custom private dns zone")
 		}
 		apiAccessProfile.PrivateDNSZone = utils.String(v.(string))
@@ -2079,6 +2095,11 @@ func flattenKubernetesClusterAutoScalerProfile(profile *containerservice.Managed
 		scaleDownUtilizationThreshold = *profile.ScaleDownUtilizationThreshold
 	}
 
+	emptyBulkDeleteMax := ""
+	if profile.MaxEmptyBulkDelete != nil {
+		emptyBulkDeleteMax = *profile.MaxEmptyBulkDelete
+	}
+
 	scanInterval := ""
 	if profile.ScanInterval != nil {
 		scanInterval = *profile.ScanInterval
@@ -2097,6 +2118,7 @@ func flattenKubernetesClusterAutoScalerProfile(profile *containerservice.Managed
 	return []interface{}{
 		map[string]interface{}{
 			"balance_similar_node_groups":      balanceSimilarNodeGroups,
+			"expander":                         string(profile.Expander),
 			"max_graceful_termination_sec":     maxGracefulTerminationSec,
 			"new_pod_scale_up_delay":           newPodScaleUpDelay,
 			"scale_down_delay_after_add":       scaleDownDelayAfterAdd,
@@ -2105,6 +2127,7 @@ func flattenKubernetesClusterAutoScalerProfile(profile *containerservice.Managed
 			"scale_down_unneeded":              scaleDownUnneededTime,
 			"scale_down_unready":               scaleDownUnreadyTime,
 			"scale_down_utilization_threshold": scaleDownUtilizationThreshold,
+			"empty_bulk_delete_max":            emptyBulkDeleteMax,
 			"scan_interval":                    scanInterval,
 			"skip_nodes_with_local_storage":    skipNodesWithLocalStorage,
 			"skip_nodes_with_system_pods":      skipNodesWithSystemPods,
@@ -2120,6 +2143,7 @@ func expandKubernetesClusterAutoScalerProfile(input []interface{}) *containerser
 	config := input[0].(map[string]interface{})
 
 	balanceSimilarNodeGroups := config["balance_similar_node_groups"].(bool)
+	expander := config["expander"].(string)
 	maxGracefulTerminationSec := config["max_graceful_termination_sec"].(string)
 	newPodScaleUpDelay := config["new_pod_scale_up_delay"].(string)
 	scaleDownDelayAfterAdd := config["scale_down_delay_after_add"].(string)
@@ -2128,12 +2152,14 @@ func expandKubernetesClusterAutoScalerProfile(input []interface{}) *containerser
 	scaleDownUnneededTime := config["scale_down_unneeded"].(string)
 	scaleDownUnreadyTime := config["scale_down_unready"].(string)
 	scaleDownUtilizationThreshold := config["scale_down_utilization_threshold"].(string)
+	emptyBulkDeleteMax := config["empty_bulk_delete_max"].(string)
 	scanInterval := config["scan_interval"].(string)
 	skipNodesWithLocalStorage := config["skip_nodes_with_local_storage"].(bool)
 	skipNodesWithSystemPods := config["skip_nodes_with_system_pods"].(bool)
 
 	return &containerservice.ManagedClusterPropertiesAutoScalerProfile{
 		BalanceSimilarNodeGroups:      utils.String(strconv.FormatBool(balanceSimilarNodeGroups)),
+		Expander:                      containerservice.Expander(expander),
 		MaxGracefulTerminationSec:     utils.String(maxGracefulTerminationSec),
 		NewPodScaleUpDelay:            utils.String(newPodScaleUpDelay),
 		ScaleDownDelayAfterAdd:        utils.String(scaleDownDelayAfterAdd),
@@ -2142,6 +2168,7 @@ func expandKubernetesClusterAutoScalerProfile(input []interface{}) *containerser
 		ScaleDownUnneededTime:         utils.String(scaleDownUnneededTime),
 		ScaleDownUnreadyTime:          utils.String(scaleDownUnreadyTime),
 		ScaleDownUtilizationThreshold: utils.String(scaleDownUtilizationThreshold),
+		MaxEmptyBulkDelete:            utils.String(emptyBulkDeleteMax),
 		ScanInterval:                  utils.String(scanInterval),
 		SkipNodesWithLocalStorage:     utils.String(strconv.FormatBool(skipNodesWithLocalStorage)),
 		SkipNodesWithSystemPods:       utils.String(strconv.FormatBool(skipNodesWithSystemPods)),

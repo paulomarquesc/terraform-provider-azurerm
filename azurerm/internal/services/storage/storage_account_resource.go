@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
+	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/services/storage/migration"
+
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2021-01-01/storage"
 	azautorest "github.com/Azure/go-autorest/autorest"
 	autorestAzure "github.com/Azure/go-autorest/autorest/azure"
 	"github.com/hashicorp/go-azure-helpers/response"
@@ -38,8 +39,11 @@ func resourceStorageAccount() *schema.Resource {
 		Update: resourceStorageAccountUpdate,
 		Delete: resourceStorageAccountDelete,
 
-		MigrateState:  ResourceStorageAccountMigrateState,
 		SchemaVersion: 2,
+		StateUpgraders: []schema.StateUpgrader{
+			migration.AccountV0ToV1(),
+			migration.AccountV1ToV2(),
+		},
 
 		Importer: &schema.ResourceImporter{
 			State: schema.ImportStatePassthrough,
@@ -57,7 +61,7 @@ func resourceStorageAccount() *schema.Resource {
 				Type:         schema.TypeString,
 				Required:     true,
 				ForceNew:     true,
-				ValidateFunc: ValidateStorageAccountName,
+				ValidateFunc: validate.StorageAccountName,
 			},
 
 			"resource_group_name": azure.SchemaResourceGroupName(),
@@ -229,7 +233,7 @@ func resourceStorageAccount() *schema.Resource {
 							Required:         true,
 							DiffSuppressFunc: suppress.CaseDifference,
 							ValidateFunc: validation.StringInSlice([]string{
-								"SystemAssigned",
+								string(storage.IdentityTypeSystemAssigned),
 							}, true),
 						},
 						"principal_id": {
@@ -253,6 +257,21 @@ func resourceStorageAccount() *schema.Resource {
 					Schema: map[string]*schema.Schema{
 						"cors_rule": schemaStorageAccountCorsRule(true),
 						"delete_retention_policy": {
+							Type:     schema.TypeList,
+							Optional: true,
+							MaxItems: 1,
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"days": {
+										Type:         schema.TypeInt,
+										Optional:     true,
+										Default:      7,
+										ValidateFunc: validation.IntBetween(1, 365),
+									},
+								},
+							},
+						},
+						"container_delete_retention_policy": {
 							Type:     schema.TypeList,
 							Optional: true,
 							MaxItems: 1,
@@ -563,7 +582,7 @@ func resourceStorageAccount() *schema.Resource {
 			"tags": {
 				Type:         schema.TypeMap,
 				Optional:     true,
-				ValidateFunc: validateAzureRMStorageAccountTags,
+				ValidateFunc: validate.StorageAccountTags,
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
 				},
@@ -591,29 +610,6 @@ func resourceStorageAccount() *schema.Resource {
 			return nil
 		},
 	}
-}
-
-func validateAzureRMStorageAccountTags(v interface{}, _ string) (warnings []string, errors []error) {
-	tagsMap := v.(map[string]interface{})
-
-	if len(tagsMap) > 50 {
-		errors = append(errors, fmt.Errorf("a maximum of 50 tags can be applied to storage account ARM resource"))
-	}
-
-	for k, v := range tagsMap {
-		if len(k) > 128 {
-			errors = append(errors, fmt.Errorf("the maximum length for a tag key is 128 characters: %q is %d characters", k, len(k)))
-		}
-
-		value, err := tags.TagValueToString(v)
-		if err != nil {
-			errors = append(errors, err)
-		} else if len(value) > 256 {
-			errors = append(errors, fmt.Errorf("the maximum length for a tag value is 256 characters: the value for %q is %d characters", k, len(value)))
-		}
-	}
-
-	return warnings, errors
 }
 
 func resourceStorageAccountCreate(d *schema.ResourceData, meta interface{}) error {
@@ -1484,7 +1480,8 @@ func expandBlobProperties(input []interface{}) storage.BlobServiceProperties {
 
 	deletePolicyRaw := v["delete_retention_policy"].([]interface{})
 	props.BlobServicePropertiesProperties.DeleteRetentionPolicy = expandBlobPropertiesDeleteRetentionPolicy(deletePolicyRaw)
-
+	containerDeletePolicyRaw := v["container_delete_retention_policy"].([]interface{})
+	props.BlobServicePropertiesProperties.ContainerDeleteRetentionPolicy = expandBlobPropertiesDeleteRetentionPolicy(containerDeletePolicyRaw)
 	corsRaw := v["cors_rule"].([]interface{})
 	props.BlobServicePropertiesProperties.Cors = expandBlobPropertiesCors(corsRaw)
 
@@ -1751,14 +1748,20 @@ func flattenBlobProperties(input storage.BlobServiceProperties) []interface{} {
 		flattenedDeletePolicy = flattenBlobPropertiesDeleteRetentionPolicy(deletePolicy)
 	}
 
-	if len(flattenedCorsRules) == 0 && len(flattenedDeletePolicy) == 0 {
+	flattenedContainerDeletePolicy := make([]interface{}, 0)
+	if containerDeletePolicy := input.BlobServicePropertiesProperties.ContainerDeleteRetentionPolicy; containerDeletePolicy != nil {
+		flattenedContainerDeletePolicy = flattenBlobPropertiesDeleteRetentionPolicy(containerDeletePolicy)
+	}
+
+	if len(flattenedCorsRules) == 0 && len(flattenedDeletePolicy) == 0 && len(flattenedContainerDeletePolicy) == 0 {
 		return []interface{}{}
 	}
 
 	return []interface{}{
 		map[string]interface{}{
-			"cors_rule":               flattenedCorsRules,
-			"delete_retention_policy": flattenedDeletePolicy,
+			"cors_rule":                         flattenedCorsRules,
+			"delete_retention_policy":           flattenedDeletePolicy,
+			"container_delete_retention_policy": flattenedContainerDeletePolicy,
 		},
 	}
 }
@@ -1958,22 +1961,12 @@ func flattenStorageAccountBypass(input storage.Bypass) []interface{} {
 	return bypass
 }
 
-func ValidateStorageAccountName(v interface{}, _ string) (warnings []string, errors []error) {
-	input := v.(string)
-
-	if !regexp.MustCompile(`\A([a-z0-9]{3,24})\z`).MatchString(input) {
-		errors = append(errors, fmt.Errorf("name (%q) can only consist of lowercase letters and numbers, and must be between 3 and 24 characters long", input))
-	}
-
-	return warnings, errors
-}
-
 func expandAzureRmStorageAccountIdentity(d *schema.ResourceData) *storage.Identity {
 	identities := d.Get("identity").([]interface{})
 	identity := identities[0].(map[string]interface{})
 	identityType := identity["type"].(string)
 	return &storage.Identity{
-		Type: &identityType,
+		Type: storage.IdentityType(identityType),
 	}
 }
 
@@ -1983,8 +1976,8 @@ func flattenAzureRmStorageAccountIdentity(identity *storage.Identity) []interfac
 	}
 
 	result := make(map[string]interface{})
-	if identity.Type != nil {
-		result["type"] = *identity.Type
+	if identity.Type != "" {
+		result["type"] = string(identity.Type)
 	}
 	if identity.PrincipalID != nil {
 		result["principal_id"] = *identity.PrincipalID
