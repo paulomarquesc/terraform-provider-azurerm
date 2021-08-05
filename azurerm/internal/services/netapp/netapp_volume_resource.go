@@ -169,6 +169,7 @@ func resourceNetAppVolume() *pluginsdk.Resource {
 							},
 						},
 
+						// Remove at v3
 						"cifs_enabled": {
 							Type:       pluginsdk.TypeBool,
 							Optional:   true,
@@ -176,6 +177,7 @@ func resourceNetAppVolume() *pluginsdk.Resource {
 							Deprecated: "Deprecated in favour of `protocols_enabled`",
 						},
 
+						// Remove at v3
 						"nfsv3_enabled": {
 							Type:       pluginsdk.TypeBool,
 							Optional:   true,
@@ -183,6 +185,7 @@ func resourceNetAppVolume() *pluginsdk.Resource {
 							Deprecated: "Deprecated in favour of `protocols_enabled`",
 						},
 
+						// Remove at v3
 						"nfsv4_enabled": {
 							Type:       pluginsdk.TypeBool,
 							Optional:   true,
