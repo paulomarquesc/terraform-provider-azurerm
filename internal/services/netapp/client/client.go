@@ -9,6 +9,7 @@ type Client struct {
 	AccountClient          *netapp.AccountsClient
 	PoolClient             *netapp.PoolsClient
 	VolumeClient           *netapp.VolumesClient
+	VolumeGroupClient      *netapp.VolumeGroupsClient
 	SnapshotClient         *netapp.SnapshotsClient
 	SnapshotPoliciesClient *netapp.SnapshotPoliciesClient
 }
@@ -23,6 +24,9 @@ func NewClient(o *common.ClientOptions) *Client {
 	volumeClient := netapp.NewVolumesClientWithBaseURI(o.ResourceManagerEndpoint, o.SubscriptionId)
 	o.ConfigureClient(&volumeClient.Client, o.ResourceManagerAuthorizer)
 
+	volumeGroupClient := netapp.NewVolumeGroupsClient(o.SubscriptionId)
+	o.ConfigureClient(&volumeGroupClient.Client, o.ResourceManagerAuthorizer)
+
 	snapshotClient := netapp.NewSnapshotsClientWithBaseURI(o.ResourceManagerEndpoint, o.SubscriptionId)
 	o.ConfigureClient(&snapshotClient.Client, o.ResourceManagerAuthorizer)
 
@@ -33,6 +37,7 @@ func NewClient(o *common.ClientOptions) *Client {
 		AccountClient:          &accountClient,
 		PoolClient:             &poolClient,
 		VolumeClient:           &volumeClient,
+		VolumeGroupClient:      &volumeGroupClient,
 		SnapshotClient:         &snapshotClient,
 		SnapshotPoliciesClient: &snapshotPoliciesClient,
 	}

@@ -42,6 +42,7 @@ func (r Registration) SupportedResources() map[string]*pluginsdk.Resource {
 		"azurerm_netapp_account":         resourceNetAppAccount(),
 		"azurerm_netapp_pool":            resourceNetAppPool(),
 		"azurerm_netapp_volume":          resourceNetAppVolume(),
+		"azurerm_netapp_volume_group":    resourceNetAppVolumeGroup(),
 		"azurerm_netapp_snapshot":        resourceNetAppSnapshot(),
 		"azurerm_netapp_snapshot_policy": resourceNetAppSnapshotPolicy(),
 	}

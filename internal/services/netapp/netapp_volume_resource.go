@@ -8,18 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/go-azure-helpers/resourcemanager/location"
-
 	"github.com/Azure/azure-sdk-for-go/services/netapp/mgmt/2021-10-01/netapp"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/azure"
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
-	"github.com/hashicorp/terraform-provider-azurerm/helpers/validate"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/services/netapp/parse"
-	netAppValidate "github.com/hashicorp/terraform-provider-azurerm/internal/services/netapp/validate"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tags"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
-	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/validation"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/timeouts"
 	"github.com/hashicorp/terraform-provider-azurerm/utils"
 )
@@ -42,238 +37,7 @@ func resourceNetAppVolume() *pluginsdk.Resource {
 			return err
 		}),
 
-		Schema: map[string]*pluginsdk.Schema{
-			"name": {
-				Type:         pluginsdk.TypeString,
-				Required:     true,
-				ForceNew:     true,
-				ValidateFunc: netAppValidate.VolumeName,
-			},
-
-			"resource_group_name": azure.SchemaResourceGroupName(),
-
-			"location": azure.SchemaLocation(),
-
-			"account_name": {
-				Type:         pluginsdk.TypeString,
-				Required:     true,
-				ForceNew:     true,
-				ValidateFunc: netAppValidate.AccountName,
-			},
-
-			"pool_name": {
-				Type:         pluginsdk.TypeString,
-				Required:     true,
-				ForceNew:     true,
-				ValidateFunc: netAppValidate.PoolName,
-			},
-
-			"volume_path": {
-				Type:         pluginsdk.TypeString,
-				Required:     true,
-				ForceNew:     true,
-				ValidateFunc: netAppValidate.VolumePath,
-			},
-
-			"service_level": {
-				Type:     pluginsdk.TypeString,
-				Required: true,
-				ForceNew: true,
-				ValidateFunc: validation.StringInSlice([]string{
-					string(netapp.ServiceLevelPremium),
-					string(netapp.ServiceLevelStandard),
-					string(netapp.ServiceLevelUltra),
-				}, false),
-			},
-
-			"subnet_id": {
-				Type:         pluginsdk.TypeString,
-				Required:     true,
-				ForceNew:     true,
-				ValidateFunc: azure.ValidateResourceID,
-			},
-
-			"create_from_snapshot_resource_id": {
-				Type:         pluginsdk.TypeString,
-				Optional:     true,
-				Computed:     true,
-				ForceNew:     true,
-				ValidateFunc: netAppValidate.SnapshotID,
-			},
-
-			"network_features": {
-				Type:     pluginsdk.TypeString,
-				Optional: true,
-				Computed: true,
-				ForceNew: true,
-				ValidateFunc: validation.StringInSlice([]string{
-					string(netapp.NetworkFeaturesBasic),
-					string(netapp.NetworkFeaturesStandard),
-				}, false),
-			},
-
-			"protocols": {
-				Type:     pluginsdk.TypeSet,
-				ForceNew: true,
-				Optional: true,
-				Computed: true,
-				MaxItems: 2,
-				Elem: &pluginsdk.Schema{
-					Type: pluginsdk.TypeString,
-					ValidateFunc: validation.StringInSlice([]string{
-						"NFSv3",
-						"NFSv4.1",
-						"CIFS",
-					}, false),
-				},
-			},
-
-			"security_style": {
-				Type:     pluginsdk.TypeString,
-				Optional: true,
-				ForceNew: true,
-				Computed: true,
-				ValidateFunc: validation.StringInSlice([]string{
-					"Unix", // Using hardcoded values instead of SDK enum since no matter what case is passed,
-					"Ntfs", // ANF changes casing to Pascal case in the backend. Please refer to https://github.com/Azure/azure-sdk-for-go/issues/14684
-				}, false),
-			},
-
-			"storage_quota_in_gb": {
-				Type:         pluginsdk.TypeInt,
-				Required:     true,
-				ValidateFunc: validation.IntBetween(100, 102400),
-			},
-
-			"throughput_in_mibps": {
-				Type:     pluginsdk.TypeFloat,
-				Optional: true,
-				Computed: true,
-			},
-
-			"export_policy_rule": {
-				Type:     pluginsdk.TypeList,
-				Optional: true,
-				MaxItems: 5,
-				Elem: &pluginsdk.Resource{
-					Schema: map[string]*pluginsdk.Schema{
-						"rule_index": {
-							Type:         pluginsdk.TypeInt,
-							Required:     true,
-							ValidateFunc: validation.IntBetween(1, 5),
-						},
-
-						"allowed_clients": {
-							Type:     pluginsdk.TypeSet,
-							Required: true,
-							Elem: &pluginsdk.Schema{
-								Type:         pluginsdk.TypeString,
-								ValidateFunc: validate.CIDR,
-							},
-						},
-
-						"protocols_enabled": {
-							Type:     pluginsdk.TypeList,
-							Optional: true,
-							Computed: true,
-							MaxItems: 1,
-							MinItems: 1,
-							Elem: &pluginsdk.Schema{
-								Type: pluginsdk.TypeString,
-								ValidateFunc: validation.StringInSlice([]string{
-									"NFSv3",
-									"NFSv4.1",
-									"CIFS",
-								}, false),
-							},
-						},
-
-						"unix_read_only": {
-							Type:     pluginsdk.TypeBool,
-							Optional: true,
-						},
-
-						"unix_read_write": {
-							Type:     pluginsdk.TypeBool,
-							Optional: true,
-						},
-
-						"root_access_enabled": {
-							Type:     pluginsdk.TypeBool,
-							Optional: true,
-						},
-					},
-				},
-			},
-
-			"tags": tags.Schema(),
-
-			"mount_ip_addresses": {
-				Type:     pluginsdk.TypeList,
-				Computed: true,
-				Elem: &pluginsdk.Schema{
-					Type: pluginsdk.TypeString,
-				},
-			},
-
-			"snapshot_directory_visible": {
-				Type:     pluginsdk.TypeBool,
-				Optional: true,
-				Computed: true,
-			},
-
-			"data_protection_replication": {
-				Type:     pluginsdk.TypeList,
-				Optional: true,
-				MaxItems: 1,
-				ForceNew: true,
-				Elem: &pluginsdk.Resource{
-					Schema: map[string]*pluginsdk.Schema{
-						"endpoint_type": {
-							Type:     pluginsdk.TypeString,
-							Optional: true,
-							Default:  "dst",
-							ValidateFunc: validation.StringInSlice([]string{
-								"dst",
-							}, false),
-						},
-
-						"remote_volume_location": azure.SchemaLocation(),
-
-						"remote_volume_resource_id": {
-							Type:         pluginsdk.TypeString,
-							Required:     true,
-							ValidateFunc: azure.ValidateResourceID,
-						},
-
-						"replication_frequency": {
-							Type:     pluginsdk.TypeString,
-							Required: true,
-							ValidateFunc: validation.StringInSlice([]string{
-								"10minutes",
-								"daily",
-								"hourly",
-							}, false),
-						},
-					},
-				},
-			},
-
-			"data_protection_snapshot_policy": {
-				Type:     pluginsdk.TypeList,
-				Optional: true,
-				MaxItems: 1,
-				Elem: &pluginsdk.Resource{
-					Schema: map[string]*pluginsdk.Schema{
-						"snapshot_policy_id": {
-							Type:         pluginsdk.TypeString,
-							Required:     true,
-							ValidateFunc: azure.ValidateResourceID,
-						},
-					},
-				},
-			},
-		},
+		Schema: netAppVolumeSchema(),
 	}
 }
 
@@ -297,141 +61,16 @@ func resourceNetAppVolumeCreate(d *pluginsdk.ResourceData, meta interface{}) err
 	}
 
 	location := azure.NormalizeLocation(d.Get("location").(string))
-	volumePath := d.Get("volume_path").(string)
-	serviceLevel := d.Get("service_level").(string)
-	subnetID := d.Get("subnet_id").(string)
 
-	networkFeatures := d.Get("network_features").(string)
-	if networkFeatures == "" {
-		networkFeatures = string(netapp.NetworkFeaturesBasic)
-	}
-
-	protocols := d.Get("protocols").(*pluginsdk.Set).List()
-	if len(protocols) == 0 {
-		protocols = append(protocols, "NFSv3")
-	}
-
-	// Handling security style property
-	securityStyle := d.Get("security_style").(string)
-	if strings.EqualFold(securityStyle, "unix") && len(protocols) == 1 && strings.EqualFold(protocols[0].(string), "cifs") {
-		return fmt.Errorf("unix security style cannot be used in a CIFS enabled volume for %s", id)
-	}
-	if strings.EqualFold(securityStyle, "ntfs") && len(protocols) == 1 && (strings.EqualFold(protocols[0].(string), "nfsv3") || strings.EqualFold(protocols[0].(string), "nfsv4.1")) {
-		return fmt.Errorf("ntfs security style cannot be used in a NFSv3/NFSv4.1 enabled volume for %s", id)
-	}
-
-	storageQuotaInGB := int64(d.Get("storage_quota_in_gb").(int) * 1073741824)
-
-	exportPolicyRuleRaw := d.Get("export_policy_rule").([]interface{})
-	exportPolicyRule := expandNetAppVolumeExportPolicyRule(exportPolicyRuleRaw)
-
-	dataProtectionReplicationRaw := d.Get("data_protection_replication").([]interface{})
-	dataProtectionSnapshotPolicyRaw := d.Get("data_protection_snapshot_policy").([]interface{})
-
-	dataProtectionReplication := expandNetAppVolumeDataProtectionReplication(dataProtectionReplicationRaw)
-	dataProtectionSnapshotPolicy := expandNetAppVolumeDataProtectionSnapshotPolicy(dataProtectionSnapshotPolicyRaw)
-
-	authorizeReplication := false
-	volumeType := ""
-	if dataProtectionReplication != nil && dataProtectionReplication.Replication != nil && strings.ToLower(string(dataProtectionReplication.Replication.EndpointType)) == "dst" {
-		authorizeReplication = true
-		volumeType = "DataProtection"
-	}
-
-	// Validating that snapshot policies are not being created in a data protection volume
-	if dataProtectionSnapshotPolicy.Snapshot != nil && volumeType != "" {
-		return fmt.Errorf("snapshot policy cannot be enabled on a data protection volume, NetApp Volume %q (Resource Group %q)", id.Name, id.ResourceGroup)
-	}
-
-	snapshotDirectoryVisible := d.Get("snapshot_directory_visible").(bool)
-
-	// Handling volume creation from snapshot case
-	snapshotResourceID := d.Get("create_from_snapshot_resource_id").(string)
-	snapshotID := ""
-	if snapshotResourceID != "" {
-		// Get snapshot ID GUID value
-		parsedSnapshotResourceID, err := parse.SnapshotID(snapshotResourceID)
-		if err != nil {
-			return fmt.Errorf("parsing snapshotResourceID %q: %+v", snapshotResourceID, err)
-		}
-
-		snapshotClient := meta.(*clients.Client).NetApp.SnapshotClient
-		snapshotResponse, err := snapshotClient.Get(
-			ctx,
-			parsedSnapshotResourceID.ResourceGroup,
-			parsedSnapshotResourceID.NetAppAccountName,
-			parsedSnapshotResourceID.CapacityPoolName,
-			parsedSnapshotResourceID.VolumeName,
-			parsedSnapshotResourceID.Name,
-		)
-		if err != nil {
-			return fmt.Errorf("getting snapshot from NetApp Volume %q (Resource Group %q): %+v", parsedSnapshotResourceID.VolumeName, parsedSnapshotResourceID.ResourceGroup, err)
-		}
-		snapshotID = *snapshotResponse.SnapshotID
-
-		// Validate if properties that cannot be changed matches (protocols, subnet_id, location, resource group, account_name, pool_name, service_level)
-		sourceVolume, err := client.Get(
-			ctx,
-			parsedSnapshotResourceID.ResourceGroup,
-			parsedSnapshotResourceID.NetAppAccountName,
-			parsedSnapshotResourceID.CapacityPoolName,
-			parsedSnapshotResourceID.VolumeName,
-		)
-		if err != nil {
-			return fmt.Errorf("getting source NetApp Volume (snapshot's parent resource) %q (Resource Group %q): %+v", parsedSnapshotResourceID.VolumeName, parsedSnapshotResourceID.ResourceGroup, err)
-		}
-
-		parsedVolumeID, err := parse.VolumeID(*sourceVolume.ID)
-		if err != nil {
-			return fmt.Errorf("parsing Source Volume ID: %s", err)
-		}
-		propertyMismatch := []string{}
-		if !ValidateSlicesEquality(*sourceVolume.ProtocolTypes, *utils.ExpandStringSlice(protocols), false) {
-			propertyMismatch = append(propertyMismatch, "protocols")
-		}
-		if !strings.EqualFold(*sourceVolume.SubnetID, subnetID) {
-			propertyMismatch = append(propertyMismatch, "subnet_id")
-		}
-		if !strings.EqualFold(*sourceVolume.Location, location) {
-			propertyMismatch = append(propertyMismatch, "location")
-		}
-		if !strings.EqualFold(string(sourceVolume.ServiceLevel), serviceLevel) {
-			propertyMismatch = append(propertyMismatch, "service_level")
-		}
-		if !strings.EqualFold(parsedVolumeID.ResourceGroup, id.ResourceGroup) {
-			propertyMismatch = append(propertyMismatch, "resource_group_name")
-		}
-		if !strings.EqualFold(parsedVolumeID.NetAppAccountName, id.NetAppAccountName) {
-			propertyMismatch = append(propertyMismatch, "account_name")
-		}
-		if !strings.EqualFold(parsedVolumeID.CapacityPoolName, id.CapacityPoolName) {
-			propertyMismatch = append(propertyMismatch, "pool_name")
-		}
-		if len(propertyMismatch) > 0 {
-			return fmt.Errorf("following NetApp Volume properties on new Volume from Snapshot does not match Snapshot's source %s: %s", id, strings.Join(propertyMismatch, ", "))
-		}
+	volumeProperties, err := getVolumePropertiesObject[netapp.VolumeProperties](ctx, d, meta, id)
+	if err != nil {
+		return err
 	}
 
 	parameters := netapp.Volume{
-		Location: utils.String(location),
-		VolumeProperties: &netapp.VolumeProperties{
-			CreationToken:   utils.String(volumePath),
-			ServiceLevel:    netapp.ServiceLevel(serviceLevel),
-			SubnetID:        utils.String(subnetID),
-			NetworkFeatures: netapp.NetworkFeatures(networkFeatures),
-			ProtocolTypes:   utils.ExpandStringSlice(protocols),
-			SecurityStyle:   netapp.SecurityStyle(securityStyle),
-			UsageThreshold:  utils.Int64(storageQuotaInGB),
-			ExportPolicy:    exportPolicyRule,
-			VolumeType:      utils.String(volumeType),
-			SnapshotID:      utils.String(snapshotID),
-			DataProtection: &netapp.VolumePropertiesDataProtection{
-				Replication: dataProtectionReplication.Replication,
-				Snapshot:    dataProtectionSnapshotPolicy.Snapshot,
-			},
-			SnapshotDirectoryVisible: utils.Bool(snapshotDirectoryVisible),
-		},
-		Tags: tags.Expand(d.Get("tags").(map[string]interface{})),
+		Location:         utils.String(location),
+		VolumeProperties: volumeProperties,
+		Tags:             tags.Expand(d.Get("tags").(map[string]interface{})),
 	}
 
 	if throughputMibps, ok := d.GetOk("throughput_in_mibps"); ok {
@@ -452,8 +91,8 @@ func resourceNetAppVolumeCreate(d *pluginsdk.ResourceData, meta interface{}) err
 	}
 
 	// If this is a data replication secondary volume, authorize replication on primary volume
-	if authorizeReplication {
-		replVolID, err := parse.VolumeID(*dataProtectionReplication.Replication.RemoteVolumeResourceID)
+	if *volumeProperties.VolumeType == string("DataProtection") {
+		replVolID, err := parse.VolumeID(*volumeProperties.DataProtection.Replication.RemoteVolumeResourceID)
 		if err != nil {
 			return err
 		}
@@ -512,7 +151,7 @@ func resourceNetAppVolumeUpdate(d *pluginsdk.ResourceData, meta interface{}) err
 	if d.HasChange("export_policy_rule") {
 		shouldUpdate = true
 		exportPolicyRuleRaw := d.Get("export_policy_rule").([]interface{})
-		exportPolicyRule := expandNetAppVolumeExportPolicyRulePatch(exportPolicyRuleRaw)
+		exportPolicyRule := expandNetAppVolumeExportPolicyRule[netapp.VolumePatchPropertiesExportPolicy](exportPolicyRuleRaw)
 		update.VolumePatchProperties.ExportPolicy = exportPolicyRule
 	}
 
@@ -581,6 +220,7 @@ func resourceNetAppVolumeRead(d *pluginsdk.ResourceData, meta interface{}) error
 		return fmt.Errorf("reading %s: %+v", *id, err)
 	}
 
+	// Setting general volume properties
 	d.Set("name", id.Name)
 	d.Set("resource_group_name", id.ResourceGroup)
 	d.Set("account_name", id.NetAppAccountName)
@@ -588,29 +228,11 @@ func resourceNetAppVolumeRead(d *pluginsdk.ResourceData, meta interface{}) error
 	if location := resp.Location; location != nil {
 		d.Set("location", azure.NormalizeLocation(*location))
 	}
+
+	// Setting Volume properties
 	if props := resp.VolumeProperties; props != nil {
-		d.Set("volume_path", props.CreationToken)
-		d.Set("service_level", props.ServiceLevel)
-		d.Set("subnet_id", props.SubnetID)
-		d.Set("network_features", props.NetworkFeatures)
-		d.Set("protocols", props.ProtocolTypes)
-		d.Set("security_style", props.SecurityStyle)
-		d.Set("snapshot_directory_visible", props.SnapshotDirectoryVisible)
-		d.Set("throughput_in_mibps", props.ThroughputMibps)
-		if props.UsageThreshold != nil {
-			d.Set("storage_quota_in_gb", *props.UsageThreshold/1073741824)
-		}
-		if err := d.Set("export_policy_rule", flattenNetAppVolumeExportPolicyRule(props.ExportPolicy)); err != nil {
-			return fmt.Errorf("setting `export_policy_rule`: %+v", err)
-		}
-		if err := d.Set("mount_ip_addresses", flattenNetAppVolumeMountIPAddresses(props.MountTargets)); err != nil {
-			return fmt.Errorf("setting `mount_ip_addresses`: %+v", err)
-		}
-		if err := d.Set("data_protection_replication", flattenNetAppVolumeDataProtectionReplication(props.DataProtection)); err != nil {
-			return fmt.Errorf("setting `data_protection_replication`: %+v", err)
-		}
-		if err := d.Set("data_protection_snapshot_policy", flattenNetAppVolumeDataProtectionSnapshotPolicy(props.DataProtection)); err != nil {
-			return fmt.Errorf("setting `data_protection_snapshot_policy`: %+v", err)
+		if err := setVolumePropertiesResourceData(d, *props); err != nil {
+			return err
 		}
 	}
 
@@ -873,296 +495,4 @@ func netappVolumeReplicationStateRefreshFunc(ctx context.Context, client *netapp
 
 		return res, strconv.Itoa(res.StatusCode), nil
 	}
-}
-
-func expandNetAppVolumeExportPolicyRule(input []interface{}) *netapp.VolumePropertiesExportPolicy {
-	results := make([]netapp.ExportPolicyRule, 0)
-	for _, item := range input {
-		if item != nil {
-			v := item.(map[string]interface{})
-			ruleIndex := int32(v["rule_index"].(int))
-			allowedClients := strings.Join(*utils.ExpandStringSlice(v["allowed_clients"].(*pluginsdk.Set).List()), ",")
-
-			cifsEnabled := false
-			nfsv3Enabled := false
-			nfsv41Enabled := false
-
-			if vpe := v["protocols_enabled"]; vpe != nil {
-				protocolsEnabled := vpe.([]interface{})
-				if len(protocolsEnabled) != 0 {
-					for _, protocol := range protocolsEnabled {
-						if protocol != nil {
-							switch strings.ToLower(protocol.(string)) {
-							case "cifs":
-								cifsEnabled = true
-							case "nfsv3":
-								nfsv3Enabled = true
-							case "nfsv4.1":
-								nfsv41Enabled = true
-							}
-						}
-					}
-				}
-			}
-
-			unixReadOnly := v["unix_read_only"].(bool)
-			unixReadWrite := v["unix_read_write"].(bool)
-			rootAccessEnabled := v["root_access_enabled"].(bool)
-
-			result := netapp.ExportPolicyRule{
-				AllowedClients: utils.String(allowedClients),
-				Cifs:           utils.Bool(cifsEnabled),
-				Nfsv3:          utils.Bool(nfsv3Enabled),
-				Nfsv41:         utils.Bool(nfsv41Enabled),
-				RuleIndex:      utils.Int32(ruleIndex),
-				UnixReadOnly:   utils.Bool(unixReadOnly),
-				UnixReadWrite:  utils.Bool(unixReadWrite),
-				HasRootAccess:  utils.Bool(rootAccessEnabled),
-			}
-
-			results = append(results, result)
-		}
-	}
-
-	return &netapp.VolumePropertiesExportPolicy{
-		Rules: &results,
-	}
-}
-
-func expandNetAppVolumeExportPolicyRulePatch(input []interface{}) *netapp.VolumePatchPropertiesExportPolicy {
-	results := make([]netapp.ExportPolicyRule, 0)
-	for _, item := range input {
-		if item != nil {
-			v := item.(map[string]interface{})
-			ruleIndex := int32(v["rule_index"].(int))
-			allowedClients := strings.Join(*utils.ExpandStringSlice(v["allowed_clients"].(*pluginsdk.Set).List()), ",")
-
-			cifsEnabled := false
-			nfsv3Enabled := false
-			nfsv41Enabled := false
-
-			if vpe := v["protocols_enabled"]; vpe != nil {
-				protocolsEnabled := vpe.([]interface{})
-				if len(protocolsEnabled) != 0 {
-					for _, protocol := range protocolsEnabled {
-						if protocol != nil {
-							switch strings.ToLower(protocol.(string)) {
-							case "cifs":
-								cifsEnabled = true
-							case "nfsv3":
-								nfsv3Enabled = true
-							case "nfsv4.1":
-								nfsv41Enabled = true
-							}
-						}
-					}
-				}
-			}
-
-			unixReadOnly := v["unix_read_only"].(bool)
-			unixReadWrite := v["unix_read_write"].(bool)
-			rootAccessEnabled := v["root_access_enabled"].(bool)
-
-			result := netapp.ExportPolicyRule{
-				AllowedClients: utils.String(allowedClients),
-				Cifs:           utils.Bool(cifsEnabled),
-				Nfsv3:          utils.Bool(nfsv3Enabled),
-				Nfsv41:         utils.Bool(nfsv41Enabled),
-				RuleIndex:      utils.Int32(ruleIndex),
-				UnixReadOnly:   utils.Bool(unixReadOnly),
-				UnixReadWrite:  utils.Bool(unixReadWrite),
-				HasRootAccess:  utils.Bool(rootAccessEnabled),
-			}
-
-			results = append(results, result)
-		}
-	}
-
-	return &netapp.VolumePatchPropertiesExportPolicy{
-		Rules: &results,
-	}
-}
-
-func expandNetAppVolumeDataProtectionReplication(input []interface{}) *netapp.VolumePropertiesDataProtection {
-	if len(input) == 0 || input[0] == nil {
-		return &netapp.VolumePropertiesDataProtection{}
-	}
-
-	replicationObject := netapp.ReplicationObject{}
-
-	replicationRaw := input[0].(map[string]interface{})
-
-	if v, ok := replicationRaw["endpoint_type"]; ok {
-		replicationObject.EndpointType = netapp.EndpointType(v.(string))
-	}
-	if v, ok := replicationRaw["remote_volume_location"]; ok {
-		replicationObject.RemoteVolumeRegion = utils.String(v.(string))
-	}
-	if v, ok := replicationRaw["remote_volume_resource_id"]; ok {
-		replicationObject.RemoteVolumeResourceID = utils.String(v.(string))
-	}
-	if v, ok := replicationRaw["replication_frequency"]; ok {
-		replicationObject.ReplicationSchedule = netapp.ReplicationSchedule(translateTFSchedule(v.(string)))
-	}
-
-	return &netapp.VolumePropertiesDataProtection{
-		Replication: &replicationObject,
-	}
-}
-
-func expandNetAppVolumeDataProtectionSnapshotPolicy(input []interface{}) *netapp.VolumePropertiesDataProtection {
-	if len(input) == 0 || input[0] == nil {
-		return &netapp.VolumePropertiesDataProtection{}
-	}
-
-	snapshotObject := netapp.VolumeSnapshotProperties{}
-
-	snapshotRaw := input[0].(map[string]interface{})
-
-	if v, ok := snapshotRaw["snapshot_policy_id"]; ok {
-		snapshotObject.SnapshotPolicyID = utils.String(v.(string))
-	}
-
-	return &netapp.VolumePropertiesDataProtection{
-		Snapshot: &snapshotObject,
-	}
-}
-
-func expandNetAppVolumeDataProtectionSnapshotPolicyPatch(input []interface{}) *netapp.VolumePatchPropertiesDataProtection {
-	if len(input) == 0 || input[0] == nil {
-		return &netapp.VolumePatchPropertiesDataProtection{}
-	}
-
-	snapshotObject := netapp.VolumeSnapshotProperties{}
-
-	snapshotRaw := input[0].(map[string]interface{})
-
-	if v, ok := snapshotRaw["snapshot_policy_id"]; ok {
-		snapshotObject.SnapshotPolicyID = utils.String(v.(string))
-	}
-
-	return &netapp.VolumePatchPropertiesDataProtection{
-		Snapshot: &snapshotObject,
-	}
-}
-
-func flattenNetAppVolumeExportPolicyRule(input *netapp.VolumePropertiesExportPolicy) []interface{} {
-	results := make([]interface{}, 0)
-	if input == nil || input.Rules == nil {
-		return results
-	}
-
-	for _, item := range *input.Rules {
-		ruleIndex := int32(0)
-		if v := item.RuleIndex; v != nil {
-			ruleIndex = *v
-		}
-		allowedClients := []string{}
-		if v := item.AllowedClients; v != nil {
-			allowedClients = strings.Split(*v, ",")
-		}
-
-		protocolsEnabled := []string{}
-		if v := item.Cifs; v != nil {
-			if *v {
-				protocolsEnabled = append(protocolsEnabled, "CIFS")
-			}
-		}
-		if v := item.Nfsv3; v != nil {
-			if *v {
-				protocolsEnabled = append(protocolsEnabled, "NFSv3")
-			}
-		}
-		if v := item.Nfsv41; v != nil {
-			if *v {
-				protocolsEnabled = append(protocolsEnabled, "NFSv4.1")
-			}
-		}
-		unixReadOnly := false
-		if v := item.UnixReadOnly; v != nil {
-			unixReadOnly = *v
-		}
-		unixReadWrite := false
-		if v := item.UnixReadWrite; v != nil {
-			unixReadWrite = *v
-		}
-		rootAccessEnabled := false
-		if v := item.HasRootAccess; v != nil {
-			rootAccessEnabled = *v
-		}
-
-		result := map[string]interface{}{
-			"rule_index":          ruleIndex,
-			"allowed_clients":     utils.FlattenStringSlice(&allowedClients),
-			"unix_read_only":      unixReadOnly,
-			"unix_read_write":     unixReadWrite,
-			"root_access_enabled": rootAccessEnabled,
-			"protocols_enabled":   utils.FlattenStringSlice(&protocolsEnabled),
-		}
-		results = append(results, result)
-	}
-
-	return results
-}
-
-func flattenNetAppVolumeMountIPAddresses(input *[]netapp.MountTargetProperties) []interface{} {
-	results := make([]interface{}, 0)
-	if input == nil {
-		return results
-	}
-
-	for _, item := range *input {
-		if item.IPAddress != nil {
-			results = append(results, item.IPAddress)
-		}
-	}
-
-	return results
-}
-
-func flattenNetAppVolumeDataProtectionReplication(input *netapp.VolumePropertiesDataProtection) []interface{} {
-	if input == nil || input.Replication == nil {
-		return []interface{}{}
-	}
-
-	if strings.ToLower(string(input.Replication.EndpointType)) == "" || strings.ToLower(string(input.Replication.EndpointType)) != "dst" {
-		return []interface{}{}
-	}
-
-	return []interface{}{
-		map[string]interface{}{
-			"endpoint_type":             strings.ToLower(string(input.Replication.EndpointType)),
-			"remote_volume_location":    location.NormalizeNilable(input.Replication.RemoteVolumeRegion),
-			"remote_volume_resource_id": input.Replication.RemoteVolumeResourceID,
-			"replication_frequency":     translateSDKSchedule(strings.ToLower(string(input.Replication.ReplicationSchedule))),
-		},
-	}
-}
-
-func flattenNetAppVolumeDataProtectionSnapshotPolicy(input *netapp.VolumePropertiesDataProtection) []interface{} {
-	if input == nil || input.Snapshot == nil {
-		return []interface{}{}
-	}
-
-	return []interface{}{
-		map[string]interface{}{
-			"snapshot_policy_id": input.Snapshot.SnapshotPolicyID,
-		},
-	}
-}
-
-func translateTFSchedule(scheduleName string) string {
-	if strings.EqualFold(scheduleName, "10minutes") {
-		return "_10minutely"
-	}
-
-	return scheduleName
-}
-
-func translateSDKSchedule(scheduleName string) string {
-	if strings.EqualFold(scheduleName, "_10minutely") {
-		return "10minutes"
-	}
-
-	return scheduleName
 }
