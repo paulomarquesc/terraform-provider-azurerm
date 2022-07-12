@@ -60,15 +60,135 @@ resource "azurerm_netapp_volume_group" "test" {
   deployment_spec_id     = "20542149-bfca-5618-1879-9863dc6767f1"
   
   volume {
-    name                         = "acctest-NetAppVolume-%[2]d"
-    volume_path                  = "my-unique-file-path-%[2]d"
+    name                         = "acctest-NetAppVolume-1-%[2]d"
+    volume_path                  = "my-unique-file-path-1-%[2]d"
     service_level                = "Standard"
     capacity_pool_id             = azurerm_netapp_pool.test.id
     subnet_id                    = azurerm_subnet.test.id
     proximity_placement_group_id = azurerm_proximity_placement_group.test.id
     volume_spec_name             = "data"
-    storage_quota_in_gb          = 100
-    throughput_in_mibps          = 65
+    storage_quota_in_gb          = 1024
+    throughput_in_mibps          = 24
+    
+    export_policy_rule {
+      rule_index            = 1
+      allowed_clients       = ["0.0.0.0/0"]
+      protocols_enabled     = ["NFSv3"]
+      unix_read_only        = false
+      unix_read_write       = true
+      kerberos5_read_only   = false
+			kerberos5_read_write  = false
+			kerberos5i_read_only  = false
+			kerberos5i_read_write = false
+			kerberos5p_read_only  = false
+			kerberos5p_read_write = false
+    }
+  
+    tags = {
+      "SkipASMAzSecPack" = "true"
+    }
+  }
+
+  volume {
+    name                         = "acctest-NetAppVolume-2-%[2]d"
+    volume_path                  = "my-unique-file-path-2-%[2]d"
+    service_level                = "Standard"
+    capacity_pool_id             = azurerm_netapp_pool.test.id
+    subnet_id                    = azurerm_subnet.test.id
+    proximity_placement_group_id = azurerm_proximity_placement_group.test.id
+    volume_spec_name             = "log"
+    storage_quota_in_gb          = 1024
+    throughput_in_mibps          = 24
+    
+    export_policy_rule {
+      rule_index            = 1
+      allowed_clients       = ["0.0.0.0/0"]
+      protocols_enabled     = ["NFSv3"]
+      unix_read_only        = false
+      unix_read_write       = true
+      kerberos5_read_only   = false
+			kerberos5_read_write  = false
+			kerberos5i_read_only  = false
+			kerberos5i_read_write = false
+			kerberos5p_read_only  = false
+			kerberos5p_read_write = false
+    }
+  
+    tags = {
+      "SkipASMAzSecPack" = "true"
+    }
+  }
+
+  volume {
+    name                         = "acctest-NetAppVolume-3-%[2]d"
+    volume_path                  = "my-unique-file-path-3-%[2]d"
+    service_level                = "Standard"
+    capacity_pool_id             = azurerm_netapp_pool.test.id
+    subnet_id                    = azurerm_subnet.test.id
+    proximity_placement_group_id = azurerm_proximity_placement_group.test.id
+    volume_spec_name             = "shared"
+    storage_quota_in_gb          = 1024
+    throughput_in_mibps          = 24
+    
+    export_policy_rule {
+      rule_index            = 1
+      allowed_clients       = ["0.0.0.0/0"]
+      protocols_enabled     = ["NFSv3"]
+      unix_read_only        = false
+      unix_read_write       = true
+      kerberos5_read_only   = false
+			kerberos5_read_write  = false
+			kerberos5i_read_only  = false
+			kerberos5i_read_write = false
+			kerberos5p_read_only  = false
+			kerberos5p_read_write = false
+    }
+  
+    tags = {
+      "SkipASMAzSecPack" = "true"
+    }
+  }
+
+  volume {
+    name                         = "acctest-NetAppVolume-4-%[2]d"
+    volume_path                  = "my-unique-file-path-4-%[2]d"
+    service_level                = "Standard"
+    capacity_pool_id             = azurerm_netapp_pool.test.id
+    subnet_id                    = azurerm_subnet.test.id
+    proximity_placement_group_id = azurerm_proximity_placement_group.test.id
+    volume_spec_name             = "data-backup"
+    storage_quota_in_gb          = 1024
+    throughput_in_mibps          = 24
+    
+    export_policy_rule {
+      rule_index            = 1
+      allowed_clients       = ["0.0.0.0/0"]
+      protocols_enabled     = ["NFSv3"]
+      unix_read_only        = false
+      unix_read_write       = true
+      kerberos5_read_only   = false
+			kerberos5_read_write  = false
+			kerberos5i_read_only  = false
+			kerberos5i_read_write = false
+			kerberos5p_read_only  = false
+			kerberos5p_read_write = false
+    }
+  
+    tags = {
+      "SkipASMAzSecPack" = "true"
+    }
+  }
+
+  volume {
+    name                         = "acctest-NetAppVolume-5-%[2]d"
+    volume_path                  = "my-unique-file-path-5-%[2]d"
+    service_level                = "Standard"
+    capacity_pool_id             = azurerm_netapp_pool.test.id
+    subnet_id                    = azurerm_subnet.test.id
+    proximity_placement_group_id = azurerm_proximity_placement_group.test.id
+    volume_spec_name             = "log-backup"
+    storage_quota_in_gb          = 1024
+    throughput_in_mibps          = 24
     
     export_policy_rule {
       rule_index            = 1
@@ -182,6 +302,14 @@ resource "azurerm_proximity_placement_group" "test" {
   resource_group_name = azurerm_resource_group.test.name
 }
 
+resource "azurerm_availability_set" "test" {
+  name                = "acctest-avset-%[1]d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+
+  proximity_placement_group_id = azurerm_proximity_placement_group.test.id
+}
+
 resource "azurerm_network_interface" "test" {
   name                = "acctest-nic-%[1]d"
   resource_group_name = azurerm_resource_group.test.name
@@ -198,11 +326,12 @@ resource "azurerm_linux_virtual_machine" "test" {
   name                            = "acctest-vm-%[1]d"
   resource_group_name             = azurerm_resource_group.test.name
   location                        = azurerm_resource_group.test.location
-  size                            = "Standard_D2s_v3"
+  size                            = "Standard_M8ms"
   admin_username                  = local.admin_username
   admin_password                  = local.admin_password
   disable_password_authentication = false
   proximity_placement_group_id    = azurerm_proximity_placement_group.test.id
+  availability_set_id             = azurerm_availability_set.test.id
   network_interface_ids = [
     azurerm_network_interface.test.id
   ]
@@ -218,12 +347,21 @@ resource "azurerm_linux_virtual_machine" "test" {
     storage_account_type = "Standard_LRS"
     caching              = "ReadWrite"
   }
+
+  tags = {
+      "Owner" = "pmarques"
+  }
 }
 
 resource "azurerm_netapp_account" "test" {
   name                = "acctest-NetAppAccount-%[1]d"
   location            = azurerm_resource_group.test.location
   resource_group_name = azurerm_resource_group.test.name
+
+  depends_on = [
+    azurerm_subnet.test,
+    azurerm_subnet.test1
+  ]
 
   tags = {
     "SkipASMAzSecPack" = "true"
@@ -236,12 +374,12 @@ resource "azurerm_netapp_pool" "test" {
   resource_group_name = azurerm_resource_group.test.name
   account_name        = azurerm_netapp_account.test.name
   service_level       = "Standard"
-  size_in_tb          = 4
+  size_in_tb          = 8
   qos_type            = "Manual"
 
   tags = {
     "SkipASMAzSecPack" = "true"
   }
 }
-`, data.RandomInteger, "westus2")
+`, data.RandomInteger, "westus")
 }
