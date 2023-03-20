@@ -146,7 +146,7 @@ The following arguments are supported:
 
 * `private_service_connection` - (Required) A `private_service_connection` block as defined below.
 
-* `ip_configuration` - (Optional) One or more `ip_configuration` blocks as defined below. This allows a static IP address to be set for this Private Endpoint, otherwise an address is dynamically allocated from the Subnet. Changing this forces a new resource to be created.
+* `ip_configuration` - (Optional) One or more `ip_configuration` blocks as defined below. This allows a static IP address to be set for this Private Endpoint, otherwise an address is dynamically allocated from the Subnet.
 
 * `tags` - (Optional) A mapping of tags to assign to the resource.
 
@@ -154,7 +154,7 @@ The following arguments are supported:
 
 A `private_dns_zone_group` block supports the following:
 
-* `name` - (Required) Specifies the Name of the Private DNS Zone Group. Changing this forces a new `private_dns_zone_group` resource to be created.
+* `name` - (Required) Specifies the Name of the Private DNS Zone Group.
 
 * `private_dns_zone_ids` - (Required) Specifies the list of Private DNS Zones to include within the `private_dns_zone_group`.
 
@@ -203,7 +203,7 @@ An `ip_configuration` block supports the following:
 
 * `private_ip_address` - (Required) Specifies the static IP address within the private endpoint's subnet to be used. Changing this forces a new resource to be created.
 
-* `subresource_name` - (Required) Specifies the subresource this IP address applies to. `subresource_names` corresponds to `group_id`. Changing this forces a new resource to be created.
+* `subresource_name` - (Optional) Specifies the subresource this IP address applies to. `subresource_names` corresponds to `group_id`. Changing this forces a new resource to be created.
 
 * `member_name` - (Optional) Specifies the member name this IP address applies to. If it is not specified, it will use the value of `subresource_name`. Changing this forces a new resource to be created.
 
@@ -214,6 +214,16 @@ An `ip_configuration` block supports the following:
 The following attributes are exported:
 
 * `id` - The ID of the Private Endpoint.
+
+* `network_interface` - A `network_interface` block as defined below.
+
+* `custom_dns_configs` - A `custom_dns_configs` block as defined below.
+
+* `private_dns_zone_configs` - A `private_dns_zone_configs` block as defined below.
+
+* `ip_configuration` - A `ip_configuration` block as defined below.
+
+* `private_dns_zone_configs` - A `private_dns_zone_configs` block as defined below.
 
 ---
 
@@ -261,11 +271,17 @@ A `private_service_connection` block exports:
 
 An `ip_configuration` block exports:
 
-* `name` - The Name of the IP Configuration.
+* `name` - (Required) The Name of the IP Configuration.
 
-* `private_ip_address` - The static IP address set by this configuration. It is recommended to use the private IP address exported in the `private_service_connection` block to obtain the address associated with the private endpoint.
+* `private_ip_address` - (Required) The static IP address set by this configuration. It is recommended to use the private IP address exported in the `private_service_connection` block to obtain the address associated with the private endpoint.
 
-* `subresource_name` - The subresource this IP address applies to, which corresponds to the `group_id`.
+* `subresource_name` - (Required) The subresource this IP address applies to, which corresponds to the `group_id`.
+
+---
+
+A `private_dns_zone_configs` block exports:
+
+* `record_sets` - A `record_sets` block as defined below.
 
 ---
 
