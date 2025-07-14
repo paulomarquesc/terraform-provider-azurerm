@@ -405,6 +405,12 @@ func resourceNetAppVolume() *pluginsdk.Resource {
 				MaxItems: 1,
 				Elem: &pluginsdk.Resource{
 					Schema: map[string]*pluginsdk.Schema{
+						"cool_access_enabled": {
+							Type:        pluginsdk.TypeBool,
+							Required:    true,
+							Description: "Whether cool access is enabled for the volume.",
+						},
+
 						"retrieval_policy": {
 							Type:         pluginsdk.TypeString,
 							Required:     true,
@@ -665,7 +671,7 @@ func resourceNetAppVolumeCreate(d *pluginsdk.ResourceData, meta interface{}) err
 
 	if len(d.Get("cool_access").([]interface{})) > 0 {
 		coolAccess := d.Get("cool_access").([]interface{})[0].(map[string]interface{})
-		parameters.Properties.CoolAccess = pointer.To(true)
+		parameters.Properties.CoolAccess = pointer.To(coolAccess["cool_access_enabled"].(bool))
 		parameters.Properties.CoolAccessRetrievalPolicy = pointer.To(volumes.CoolAccessRetrievalPolicy(coolAccess["retrieval_policy"].(string)))
 		parameters.Properties.CoolAccessTieringPolicy = pointer.To(volumes.CoolAccessTieringPolicy(coolAccess["tiering_policy"].(string)))
 		parameters.Properties.CoolnessPeriod = pointer.To(int64(coolAccess["coolness_period_in_days"].(int)))
@@ -815,7 +821,10 @@ func resourceNetAppVolumeUpdate(d *pluginsdk.ResourceData, meta interface{}) err
 	if d.HasChange("cool_access") {
 		if len(d.Get("cool_access").([]interface{})) > 0 {
 			coolAccess := d.Get("cool_access").([]interface{})[0].(map[string]interface{})
-			update.Properties.CoolAccess = pointer.To(true)
+
+			if d.HasChange("cool_access.0.cool_access_enabled") {
+				update.Properties.CoolAccess = pointer.To(coolAccess["cool_access_enabled"].(bool))
+			}
 
 			if d.HasChange("cool_access.0.retrieval_policy") {
 				update.Properties.CoolAccessRetrievalPolicy = pointer.To(volumes.CoolAccessRetrievalPolicy(coolAccess["retrieval_policy"].(string)))
@@ -927,10 +936,12 @@ func resourceNetAppVolumeRead(d *pluginsdk.ResourceData, meta interface{}) error
 		d.Set("key_vault_private_endpoint_id", props.KeyVaultPrivateEndpointResourceId)
 		d.Set("large_volume_enabled", props.IsLargeVolume)
 
-		if pointer.From(props.CoolAccess) {
+		if pointer.From(props.CoolAccess) || len(d.Get("cool_access").([]interface{})) > 0 ||
+			props.CoolAccessRetrievalPolicy != nil || props.CoolAccessTieringPolicy != nil || props.CoolnessPeriod != nil {
 			// enums returned from the API are inconsistent so normalize them here
 			// https://github.com/Azure/azure-rest-api-specs/issues/35371
 			coolAccess := map[string]interface{}{
+				"cool_access_enabled":     pointer.From(props.CoolAccess),
 				"retrieval_policy":        normalizeCoolAccessRetrievalPolicy(pointer.From(props.CoolAccessRetrievalPolicy)),
 				"tiering_policy":          normalizeCoolAccessTieringPolicy(pointer.From(props.CoolAccessTieringPolicy)),
 				"coolness_period_in_days": pointer.From(props.CoolnessPeriod),

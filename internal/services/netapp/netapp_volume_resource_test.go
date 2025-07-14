@@ -464,6 +464,58 @@ func TestAccNetAppVolume_coolAccess(t *testing.T) {
 	})
 }
 
+func TestAccNetAppVolume_coolAccessUpdate(t *testing.T) {
+	data := acceptance.BuildTestData(t, "azurerm_netapp_volume", "test")
+	r := NetAppVolumeResource{}
+
+	data.ResourceTest(t, r, []acceptance.TestStep{
+		{
+			Config: r.coolAccessEnabled(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("cool_access.0.cool_access_enabled").HasValue("true"),
+				check.That(data.ResourceName).Key("cool_access.0.tiering_policy").HasValue("Auto"),
+				check.That(data.ResourceName).Key("cool_access.0.retrieval_policy").HasValue("OnRead"),
+				check.That(data.ResourceName).Key("cool_access.0.coolness_period_in_days").HasValue("10"),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.coolAccessUpdatedProperties(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("cool_access.0.cool_access_enabled").HasValue("true"),
+				check.That(data.ResourceName).Key("cool_access.0.tiering_policy").HasValue("SnapshotOnly"),
+				check.That(data.ResourceName).Key("cool_access.0.retrieval_policy").HasValue("Default"),
+				check.That(data.ResourceName).Key("cool_access.0.coolness_period_in_days").HasValue("30"),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.coolAccessDisabledExplicitly(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("cool_access.0.cool_access_enabled").HasValue("false"),
+				check.That(data.ResourceName).Key("cool_access.0.tiering_policy").HasValue("SnapshotOnly"),
+				check.That(data.ResourceName).Key("cool_access.0.retrieval_policy").HasValue("Default"),
+				check.That(data.ResourceName).Key("cool_access.0.coolness_period_in_days").HasValue("30"),
+			),
+		},
+		data.ImportStep(),
+		{
+			Config: r.coolAccessReEnabled(data),
+			Check: acceptance.ComposeTestCheckFunc(
+				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("cool_access.0.cool_access_enabled").HasValue("true"),
+				check.That(data.ResourceName).Key("cool_access.0.tiering_policy").HasValue("Auto"),
+				check.That(data.ResourceName).Key("cool_access.0.retrieval_policy").HasValue("Never"),
+				check.That(data.ResourceName).Key("cool_access.0.coolness_period_in_days").HasValue("60"),
+			),
+		},
+		data.ImportStep(),
+	})
+}
+
 func (t NetAppVolumeResource) Exists(ctx context.Context, clients *clients.Client, state *pluginsdk.InstanceState) (*bool, error) {
 	id, err := volumes.ParseVolumeID(state.ID)
 	if err != nil {
@@ -1862,6 +1914,7 @@ resource "azurerm_netapp_volume" "test" {
   throughput_in_mibps = 1.562
 
   cool_access {
+    cool_access_enabled     = true
     tiering_policy          = "Auto"
     retrieval_policy        = "OnRead"
     coolness_period_in_days = 10
@@ -1891,6 +1944,7 @@ resource "azurerm_netapp_volume" "test" {
   throughput_in_mibps = 1.562
 
   cool_access {
+    cool_access_enabled     = true
     tiering_policy          = "SnapshotOnly"
     retrieval_policy        = "Default"
     coolness_period_in_days = 10
@@ -1920,6 +1974,7 @@ resource "azurerm_netapp_volume" "test" {
   throughput_in_mibps = 1.562
 
   cool_access {
+    cool_access_enabled     = true
     tiering_policy          = "SnapshotOnly"
     retrieval_policy        = "Never"
     coolness_period_in_days = 30
@@ -1948,6 +2003,161 @@ resource "azurerm_netapp_volume" "test" {
   subnet_id           = azurerm_subnet.test.id
   storage_quota_in_gb = 100
   throughput_in_mibps = 1.562
+
+  tags = {
+    "CreatedOnDate"    = "2022-07-08T23:50:21Z",
+    "SkipASMAzSecPack" = "true"
+  }
+}
+`, NetAppVolumeResource{}.templateCoolAccess(data), data.RandomInteger, data.RandomInteger)
+}
+
+func (NetAppVolumeResource) coolAccessExplicitlyDisabled(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+%s
+
+resource "azurerm_netapp_volume" "test" {
+  name                = "acctest-NetAppVolume-%d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  account_name        = azurerm_netapp_account.test.name
+  pool_name           = azurerm_netapp_pool.test.name
+  volume_path         = "my-unique-file-path-%d"
+  service_level       = "Standard"
+  subnet_id           = azurerm_subnet.test.id
+  storage_quota_in_gb = 100
+  throughput_in_mibps = 1.562
+
+  cool_access {
+    cool_access_enabled     = false
+    tiering_policy          = "Auto"
+    retrieval_policy        = "OnRead"
+    coolness_period_in_days = 10
+  }
+
+  tags = {
+    "CreatedOnDate"    = "2022-07-08T23:50:21Z",
+    "SkipASMAzSecPack" = "true"
+  }
+}
+`, NetAppVolumeResource{}.templateCoolAccess(data), data.RandomInteger, data.RandomInteger)
+}
+
+func (NetAppVolumeResource) coolAccessEnabled(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+%s
+
+resource "azurerm_netapp_volume" "test" {
+  name                = "acctest-NetAppVolume-%d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  account_name        = azurerm_netapp_account.test.name
+  pool_name           = azurerm_netapp_pool.test.name
+  volume_path         = "my-unique-file-path-%d"
+  service_level       = "Standard"
+  subnet_id           = azurerm_subnet.test.id
+  storage_quota_in_gb = 100
+  throughput_in_mibps = 1.562
+
+  cool_access {
+    cool_access_enabled     = true
+    tiering_policy          = "Auto"
+    retrieval_policy        = "OnRead"
+    coolness_period_in_days = 10
+  }
+
+  tags = {
+    "CreatedOnDate"    = "2022-07-08T23:50:21Z",
+    "SkipASMAzSecPack" = "true"
+  }
+}
+`, NetAppVolumeResource{}.templateCoolAccess(data), data.RandomInteger, data.RandomInteger)
+}
+
+func (NetAppVolumeResource) coolAccessUpdatedProperties(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+%s
+
+resource "azurerm_netapp_volume" "test" {
+  name                = "acctest-NetAppVolume-%d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  account_name        = azurerm_netapp_account.test.name
+  pool_name           = azurerm_netapp_pool.test.name
+  volume_path         = "my-unique-file-path-%d"
+  service_level       = "Standard"
+  subnet_id           = azurerm_subnet.test.id
+  storage_quota_in_gb = 100
+  throughput_in_mibps = 1.562
+
+  cool_access {
+    cool_access_enabled     = true
+    tiering_policy          = "SnapshotOnly"
+    retrieval_policy        = "Default"
+    coolness_period_in_days = 30
+  }
+
+  tags = {
+    "CreatedOnDate"    = "2022-07-08T23:50:21Z",
+    "SkipASMAzSecPack" = "true"
+  }
+}
+`, NetAppVolumeResource{}.templateCoolAccess(data), data.RandomInteger, data.RandomInteger)
+}
+
+func (NetAppVolumeResource) coolAccessDisabledExplicitly(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+%s
+
+resource "azurerm_netapp_volume" "test" {
+  name                = "acctest-NetAppVolume-%d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  account_name        = azurerm_netapp_account.test.name
+  pool_name           = azurerm_netapp_pool.test.name
+  volume_path         = "my-unique-file-path-%d"
+  service_level       = "Standard"
+  subnet_id           = azurerm_subnet.test.id
+  storage_quota_in_gb = 100
+  throughput_in_mibps = 1.562
+
+  cool_access {
+    cool_access_enabled     = false
+    tiering_policy          = "SnapshotOnly"
+    retrieval_policy        = "Default"
+    coolness_period_in_days = 30
+  }
+
+  tags = {
+    "CreatedOnDate"    = "2022-07-08T23:50:21Z",
+    "SkipASMAzSecPack" = "true"
+  }
+}
+`, NetAppVolumeResource{}.templateCoolAccess(data), data.RandomInteger, data.RandomInteger)
+}
+
+func (NetAppVolumeResource) coolAccessReEnabled(data acceptance.TestData) string {
+	return fmt.Sprintf(`
+%s
+
+resource "azurerm_netapp_volume" "test" {
+  name                = "acctest-NetAppVolume-%d"
+  location            = azurerm_resource_group.test.location
+  resource_group_name = azurerm_resource_group.test.name
+  account_name        = azurerm_netapp_account.test.name
+  pool_name           = azurerm_netapp_pool.test.name
+  volume_path         = "my-unique-file-path-%d"
+  service_level       = "Standard"
+  subnet_id           = azurerm_subnet.test.id
+  storage_quota_in_gb = 100
+  throughput_in_mibps = 1.562
+
+  cool_access {
+    cool_access_enabled     = true
+    tiering_policy          = "Auto"
+    retrieval_policy        = "Never"
+    coolness_period_in_days = 60
+  }
 
   tags = {
     "CreatedOnDate"    = "2022-07-08T23:50:21Z",

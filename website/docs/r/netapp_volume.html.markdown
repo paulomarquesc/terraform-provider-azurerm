@@ -213,6 +213,8 @@ The following arguments are supported:
 
 A `cool_access` block supports the following:
 
+* `cool_access_enabled` - (Required) Whether cool access is enabled for the volume.
+
 * `retrieval_policy` - (Required) The cool access retrieval policy for the volume. Possible values are `Default`, `Never` and `OnRead`.
 
 * `tiering_policy` - (Required) The cool access tiering policy for the volume. Possible values are `Auto` and `SnapshotOnly`.
